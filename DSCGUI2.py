@@ -12,6 +12,7 @@ sys.path.append(script_directory)
 import DSCDataClass2 as DC
 import tkinter as tk
 from tkinter import ttk
+from tkinter import messagebox
 from matplotlib.backends.backend_tkagg import (FigureCanvasTkAgg, NavigationToolbar2Tk)
 from matplotlib.pyplot import close
 
@@ -38,68 +39,66 @@ def plotData():
     
     if bPlot.cget('text') == 'Update': data.cleanPlot()
 
-    tempTitle = eTempTitle.get()
-    timeTitle = eTimeTitle.get()
-    if tempTitle != False: data.plotTitleTemp = tempTitle
-    if timeTitle != False: data.plotTitleTime = timeTitle
+    tempTitle = eTitle.get()
+    if tempTitle != '': data.plotTitle = tempTitle
+
 
     data.plotRun = int(eRun.get())
 
     # Temp Plot
-    data.plot('temp')
+    data.plot()
     
-    canvasTemp = FigureCanvasTkAgg(data.fig1, master = tabTemp)
-    
-    canvasTemp.draw()
-    
-    canvasTemp.get_tk_widget().grid(row = 1, column = 2, rowspan = 20)
-    
-    
-    
-    toolbar_frameTemp = tk.Frame(master = tabTemp)
-    toolbar_frameTemp.grid(row = 21, column = 2)
-    
-    toolbarTemp = NavigationToolbar2Tk(canvasTemp, toolbar_frameTemp)
-    toolbarTemp.update()
-    
-    # Time Plot
-    data.plot('time')
-    
-    canvasTime = FigureCanvasTkAgg(data.fig2, master = tabTime)
-    
-    canvasTime.draw()
-    
-    canvasTime.get_tk_widget().grid(row = 1, column = 2, rowspan = 20)
-    
-    
-    
-    toolbar_frameTime = tk.Frame(master = tabTime)
-    toolbar_frameTime.grid(row = 21, column = 2)
-    
-    toolbarTime = NavigationToolbar2Tk(canvasTime, toolbar_frameTime)
-    toolbarTime.update()
-
+    if bPlot.cget('text') == 'Plot':
+        canvasTemp = FigureCanvasTkAgg(data.fig, master = root)
+        
+        canvasTemp.draw()
+        
+        canvasTemp.get_tk_widget().pack(expand = 1, fill = 'both')
+        
+        
+        
+        toolbar_frameTemp = tk.Frame(master = root)
+        toolbar_frameTemp.pack(expand = 1, fill = 'both')
+        
+        toolbarTemp = NavigationToolbar2Tk(canvasTemp, toolbar_frameTemp)
+        toolbarTemp.update()
+    data.fig.canvas.draw()
     # Update Button Text
     bPlot.config(text = 'Update')
 
 def on_closing():
-    data.deletePlots()
-    close(data.fig1)
-    close(data.fig2)
+    close(all)
     
 def swapScatter():
     data.scatter = not data.scatter
-    
+
+def timeTempSwitch():
+    if bTimeTemp.cget('text') == 'Temp':
+        bTimeTemp.config(text = 'Time')
+        lTimeTemp.config(text = 'Temperature\nActive')
+        data.plotType = 'Temp'
+    else:
+        bTimeTemp.config(text = 'Temp')
+        lTimeTemp.config(text = 'Time\nActive')
+        data.plotType = 'Time'
+
 def intersectIntegrate():
     global data
     data.analysisMode = not data.analysisMode
     
     if bIntersectIntegrate.cget('text') == 'Intersect':
         bIntersectIntegrate.config(text = 'Integrate')
-        lIntersectIntegrate.config(text = 'Integration\nActive')
+        lIntersectIntegrate.config(text = 'Intersection\nActive')
     else:
         bIntersectIntegrate.config(text = 'Intersect')
-        lIntersectIntegrate.config(text = 'Intersection\nActive')
+        lIntersectIntegrate.config(text = 'Integration\nActive')
+
+def autoNucTime():
+    times = [str(data.autoNucTime(x)) + '\n' for x in range(1, data.runs+1)]
+    delim = '\n'
+    
+    strTimes = delim.join([str(ele) for ele in times])
+    messagebox.showinfo('Auto-Generated Nucleation Times', strTimes)
 
 # Structure
 root = tk.Tk()
@@ -107,20 +106,20 @@ root.title("DSC Analyze")
 
 # Tabs
 Controls = ttk.Notebook(root)
-Graphs = ttk.Notebook(root)
+# Graphs = ttk.Notebook(root)
 
 tabSettings = ttk.Frame(Controls)
 tabPlotting = ttk.Frame(Controls)
-tabTemp = ttk.Frame(Graphs)
-tabTime = ttk.Frame(Graphs)
+# tabTemp = ttk.Frame(Graphs)
+# tabTime = ttk.Frame(Graphs)
 
 Controls.add(tabSettings, text='File Settings')
 Controls.add(tabPlotting, text='Plotting')
-Graphs.add(tabTemp, text='Heat Temperature')
-Graphs.add(tabTime, text='Heat Time')
+# Graphs.add(tabTemp, text='Heat Temperature')
+# Graphs.add(tabTime, text='Heat Time')
 
 Controls.pack(expand=1, fill='both')
-Graphs.pack(expand=1, fill='both')
+# Graphs.pack(expand=1, fill='both')
 
 # Settings Tab
 lPath = tk.Label(tabSettings, text = 'File Path:')
@@ -135,15 +134,15 @@ bSubmit.grid(row = 0, column = 4, sticky = tk.W, pady = 2)
 bPlot = tk.Button(tabPlotting, text = 'Plot', command = plotData)
 bPlot.grid(row = 0, rowspan = 2, column = 0, sticky = tk.W, pady = 2)
 
-lTempTitle = tk.Label(tabPlotting, text = 'Temp Plot\nTitle')
-lTempTitle.grid(row = 0, column = 1, sticky = tk.W, pady = 2)
-eTempTitle = tk.Entry(tabPlotting)
-eTempTitle.grid(row = 1, column = 1, sticky = tk.W, pady = 2)
+lTimeTemp = tk.Label(tabPlotting, text = 'Temperature\nActive')
+lTimeTemp.grid(row = 0, column = 1, sticky = tk.W, pady = 2)
+bTimeTemp = tk.Button(tabPlotting, text = 'Time', command = timeTempSwitch)
+bTimeTemp.grid(row = 1, column = 1, sticky = tk.W, pady = 2)
 
-lTimeTitle = tk.Label(tabPlotting, text = 'Time Plot\nTitle')
-lTimeTitle.grid(row = 0, column = 2, sticky = tk.W, pady = 2)
-eTimeTitle = tk.Entry(tabPlotting)
-eTimeTitle.grid(row = 1, column = 2, sticky = tk.W, pady = 2)
+lTitle = tk.Label(tabPlotting, text = 'Plot Title')
+lTitle.grid(row = 0, column = 2, sticky = tk.W, pady = 2)
+eTitle = tk.Entry(tabPlotting)
+eTitle.grid(row = 1, column = 2, sticky = tk.W, pady = 2)
 
 lScatter = tk.Label(tabPlotting, text = 'Scatter?')
 lScatter.grid(row = 0, column = 3, sticky = tk.W, pady = 2)
@@ -158,5 +157,10 @@ eRun.grid(row = 1, column = 4, sticky = tk.W, pady = 2)
 
 lIntersectIntegrate = tk.Label(tabPlotting, text = 'Intersection\nActive')
 lIntersectIntegrate.grid(row = 0, column = 5, sticky = tk.W, pady = 2)
-bIntersectIntegrate = tk.Button(tabPlotting, text = 'Intersect', command = intersectIntegrate)
+bIntersectIntegrate = tk.Button(tabPlotting, text = 'Integrate', command = intersectIntegrate)
 bIntersectIntegrate.grid(row = 1, column = 5, sticky = tk.W, pady = 2)
+
+lAutoNucTime = tk.Label(tabPlotting, text = 'Auto-Get\nNuc Times')
+lAutoNucTime.grid(row = 0, column = 6, sticky = tk.W, pady = 2)
+bAutoNucTime = tk.Button(tabPlotting, text = 'Generate', command = autoNucTime)
+bAutoNucTime.grid(row = 0, column = 6, sticky = tk.W, pady = 2)

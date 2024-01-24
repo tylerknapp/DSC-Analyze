@@ -17,14 +17,14 @@ class DSCData:
         self.filepath = filepath
         self.runs = self.read('runcount')
         self.steps = self.read('stepcount')
+        self.rampRate = self.read('ramprate')
         self.data = self.read('data')
         self.sampleName = self.read('samplename')
         self.instrumentName = self.read('instrument')
         self.rundate = self.read('rundate')
         self.procedure = self.read('procedure')
         self.operator = self.read('operator')
-        self.plotTitleTemp = self.sampleName
-        self.plotTitleTime = self.sampleName
+        self.plotTitle = self.sampleName
         
         # Conditionals
         self.scatter = False
@@ -32,15 +32,13 @@ class DSCData:
         self.analysisMode = True # True is Intersection, False is Integration
         
         # Plot Related
-        self.fig1, self.axTemp = plt.subplots() # Create one figure, fig, with two subplots, axTemp and axTime
-        self.fig2, self.axTime = plt.subplots()
-        self.cid1 = None
-        self.cid2 = None
+        self.fig, self.ax = plt.subplots() # Create one figure, fig, with two subplots, axTemp and axTime
+        self.cid = self.fig.canvas.mpl_connect('pick_event', self.onpick)
+        self.plotType = 'Temp'
         
         # Analysis Variables
         self.pointBank = []
         self.intersectPoints = {'m1': None, 'b1': None, 'm2': None, 'b2': None}
-        self.linearLine = [0, 1]
         
     ### METHODS ###
     
@@ -134,175 +132,127 @@ class DSCData:
                 text = text[text.index('Data On'):text.index('Data Off')]
                 textList = text.split(';')
                 return len(textList)-2
+            elif locator == 'ramprate':
+                text = lines[7]
+                textList = text.split()
+                return int(textList[1])
         
 
-    def plot(self, x):
+    def plot(self):
         try:
-            if x == 'temp':
-                if self.plotRun == 0:
-                    
-                    if self.scatter == False:
-                        for i in range(0, self.runs):
-                            self.axTemp.plot(self.data['Temp ' + str(i+1)], self.data['Heat ' + str(i+1)],
-                                             picker = True, pickradius = 5)
-                    else:
-                        for i in range(0, self.runs):
-                            self.axTemp.scatter(self.data['Temp ' + str(i+1)], self.data['Heat ' + str(i+1)],
-                                             picker = True, pickradius = 5)
+            if self.plotRun == 0:
+                
+                if self.scatter == False:
+                    for i in range(0, self.runs):
+                        self.ax.plot(self.data[self.plotType + ' ' + str(i+1)], self.data['Heat ' + str(i+1)],
+                                         picker = True, pickradius = 2)
                 else:
-                    
-                    if self.scatter == False:
-                        self.axTemp.plot(self.data['Temp ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
-                                         picker = True, pickradius = 5)
-                    else:
-                        self.axTemp.scatter(self.data['Temp ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
-                                         picker = True, pickradius = 5)
-                if __name__ == "__main__": self.fig1.show()
+                    for i in range(0, self.runs):
+                        self.ax.scatter(self.data[self.plotType + ' ' + str(i+1)], self.data['Heat ' + str(i+1)],
+                                         picker = True, pickradius = 2)
+            else:
+                
+                if self.scatter == False:
+                    self.ax.plot(self.data[self.plotType + ' ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
+                                     picker = True, pickradius = 2)
+                else:
+                    self.ax.scatter(self.data[self.plotType + ' ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
+                                     picker = True, pickradius = 2)
+            if __name__ == "__main__": self.fig.show()
 
-            elif x == 'time':
-                if self.plotRun == 0:
-                    
-                    if self.scatter == False:
-                        for i in range(0, self.runs):
-                            self.axTime.plot(self.data['Time ' + str(i+1)], self.data['Heat ' + str(i+1)],
-                                             picker = True, pickradius = 5)
-                    else:
-                        for i in range(0, self.runs):
-                            self.axTime.scatter(self.data['Time ' + str(i+1)], self.data['Heat ' + str(i+1)],
-                                             picker = True, pickradius = 5)
-                else:
-                    
-                    if self.scatter == False:
-                        self.axTime.plot(self.data['Time ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
-                                         picker = True, pickradius = 5)
-                    else:
-                        self.axTime.scatter(self.data['Time ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
-                                         picker = True, pickradius = 5)
-                if __name__ == "__main__": self.fig2.show()
             
-            self.axTemp.set_title(self.plotTitleTemp)
-            self.axTime.set_title(self.plotTitleTime)
-            self.axTemp.set_xlabel('Temperature (°C)')
-            self.axTemp.set_ylabel('Heat Flow (W/g)')
-            self.axTime.set_xlabel('Time (s)')
-            self.axTime.set_ylabel('Heat Flow (W/g)')
+            self.ax.set_title(self.plotTitle)
+            if self.plotType == 'Temp': self.ax.set_xlabel('Temperature (°C)')
+            else: self.ax.set_xlabel('Time (s)')
+            self.ax.set_ylabel('Heat Flow (W/g)')
             
-            self.cid1 = self.fig1.canvas.mpl_connect('pick_event', self.onpick)
-            self.cid2 = self.fig2.canvas.mpl_connect('pick_event', self.onpick)
+            self.cid = self.fig.canvas.mpl_connect('pick_event', self.onpick)
             
         except Exception as error:
             print(error)
 
 
     def cleanPlot(self):
-        self.fig1.clf()
-        plt.close(self.fig1)
-        self.fig1, self.axTemp = plt.subplots()
+        plt.cla()
+        self.pointBank = []
+        self.intersectPoints = {'m1': None, 'b1': None, 'm2': None, 'b2': None}
         
-        self.fig2.clf()
-        plt.close(self.fig2)
-        self.fig2, self.axTime = plt.subplots()
-        
-        self.fig1.canvas.mpl_disconnect(self.cid1)
-        self.fig2.canvas.mpl_disconnect(self.cid2)
-        
-        self.linearLine = [0, 1]
-        
-    def deletePlots(self):
-        plt.close(self.fig1)
-        plt.close(self.fig2)
+    # def deletePlots(self):
+    #     plt.close(self.fig1)
+    #     plt.close(self.fig2)
         
     def onpick(self, event):
+        if (len(self.pointBank) == 4 and self.analysisMode == True) or (len(self.pointBank) == 2 and self.analysisMode == False):
+            self.cleanPlot()
+            self.plot()
+
         thisline = event.artist
         xdata = thisline.get_xdata()
         ydata = thisline.get_ydata()
         ind = event.ind
         points = (xdata, ydata, ind)
+
+        self.ax.text(self.data[self.plotType + ' ' + str(self.plotRun)].iloc[ind[0]], 
+                     self.data['Heat ' + str(self.plotRun)].iloc[ind[0]],
+                     self.data[self.plotType + ' ' + str(self.plotRun)].iloc[ind[0]])
+        self.fig.canvas.draw()
         
         if self.analysisMode == True:
             self.intersectCalc(points)
         else:
             self.integrateCalc(points)
     
-    def pointClean(self):
-        self.pointBank = []
-        self.intersectPoints = {'m1': None, 'b1': None, 'm2': None, 'b2': None}
-    
     
     def intersectCalc(self, points):
-        isTime = False
-        if len(self.pointBank) == 4:
-            self.pointClean()
-            self.cleanPlot()
-            self.plot('temp')
-            self.plot('time')
-        
-        self.pointBank.append([points[0][0], points[1][0], points[2][0]])
-        currentRun = self.plotRun
-        
-        if self.pointBank[0][0] - self.data['Time ' + str(currentRun)].iloc[self.pointBank[0][2]-1] == 0.2: isTime = True; print(isTime)
-        if len(self.pointBank) == 2:
-            if isTime == False:
-                xlist = [x for x in self.data['Temp ' + str(currentRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
-                ylist = [y for y in self.data['Heat ' + str(currentRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
-                
-                xArray = np.array(xlist)
-                yArray = np.array(ylist)
-                
-                self.linearLine[0] = self.axTemp.plot(xlist, ylist)
-                self.intersectPoints['m1'], self.intersectPoints['b1'] = self.linearreg(xArray, yArray)
-            else:
-                xlist = [x for x in self.data['Time ' + str(currentRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
-                ylist = [y for y in self.data['Heat ' + str(currentRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
-                
-                xArray = np.array(xlist)
-                yArray = np.array(ylist)
-                
-                self.linearLine[0] = self.axTime.plot(xlist, ylist)
-                self.intersectPoints['m1'], self.intersectPoints['b1'] = self.linearreg(xArray, yArray)
-            
-            if isTime == False:
-                self.fig1.canvas.draw()
-            else:
-                self.fig2.canvas.draw()
-            
-        if len(self.pointBank) == 4:
-            if isTime == False:
-                xlist = [x for x in self.data['Temp ' + str(currentRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
-                ylist = [y for y in self.data['Heat ' + str(currentRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
-                
-                xArray = np.array(xlist)
-                yArray = np.array(ylist)
-                
-                self.linearLine[1] = self.axTemp.plot(xlist, ylist)
-                self.intersectPoints['m2'], self.intersectPoints['b2'] = self.linearreg(xArray, yArray)
-            else:
-                xlist = [x for x in self.data['Time ' + str(currentRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
-                ylist = [y for y in self.data['Heat ' + str(currentRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
-                
-                xArray = np.array(xlist)
-                yArray = np.array(ylist)
-                
-                self.linearLine[1] = self.axTime.plot(xlist, ylist)
-                self.intersectPoints['m2'], self.intersectPoints['b2'] = self.linearreg(xArray, yArray)
 
-            A = np.array([[1, -self.intersectPoints['m1']],[1, -self.intersectPoints['m2']]])
-            Ay = np.array([[self.intersectPoints['b1'], -self.intersectPoints['m1']],[self.intersectPoints['b2'], -self.intersectPoints['m2']]])
-            Ax = np.array([[1, self.intersectPoints['b1']],[1, self.intersectPoints['b2']]])
+        try:
+            self.pointBank.append([points[0][0], points[1][0], points[2][0]])
+            cRun = self.plotRun
             
-            detA = np.linalg.det(A)
-            detAy = np.linalg.det(Ay)
-            detAx = np.linalg.det(Ax)
-            
-            Inters = (detAx/detA, detAy/detA)
-            
-            if isTime == False:
-                self.axTemp.text(Inters[0], Inters[1], Inters[0])
-                self.fig1.canvas.draw()
-            else:
-                self.axTime.text(Inters[0], Inters[1], Inters[0])
-                self.fig2.canvas.draw()
-            
+            # Get first linear line
+            if len(self.pointBank) == 2:
+                
+                xlist = [x for x in self.data[self.plotType + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                ylist = [y for y in self.data['Heat ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                
+                xArray = np.array(xlist)
+                yArray = np.array(ylist)
+                
+                self.ax.plot(xlist, ylist)
+                self.intersectPoints['m1'], self.intersectPoints['b1'] = self.linearreg(xArray, yArray)
+                
+                
+                self.fig.canvas.draw()
+                
+            # Get second linear line
+            if len(self.pointBank) == 4:
+                xlist = [x for x in self.data[self.plotType + ' ' + str(cRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
+                ylist = [y for y in self.data['Heat ' + str(cRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
+                
+                xArray = np.array(xlist)
+                yArray = np.array(ylist)
+                
+                self.ax.plot(xlist, ylist)
+                self.intersectPoints['m2'], self.intersectPoints['b2'] = self.linearreg(xArray, yArray)
+    
+                # Find the intersection of the two lines
+                A = np.array([[1, -self.intersectPoints['m1']],[1, -self.intersectPoints['m2']]])
+                Ay = np.array([[self.intersectPoints['b1'], -self.intersectPoints['m1']],[self.intersectPoints['b2'], -self.intersectPoints['m2']]])
+                Ax = np.array([[1, self.intersectPoints['b1']],[1, self.intersectPoints['b2']]])
+                
+                detA = np.linalg.det(A)
+                detAy = np.linalg.det(Ay)
+                detAx = np.linalg.det(Ax)
+                
+                Inters = (detAx/detA, detAy/detA)
+                
+                # Place text at intersection
+                self.ax.text(0, 1, 'Intersection: ' + str(Inters[0]), transform = self.ax.transAxes)
+                self.fig.canvas.draw()
+        except:
+            self.cleanPlot()
+            self.plot()
+            self.fig.canvas.draw()
             
     def linearreg(self, x, y):
         #Number of points
@@ -324,14 +274,58 @@ class DSCData:
         return(m, b)
         
     def integrateCalc(self, points):
-        self.pointBank.append(points)
+        try:
+                 
+            self.pointBank.append([points[0][0], points[1][0], points[2][0]])
+            cRun = self.plotRun
+            
+            if len(self.pointBank) == 2:
+                xlist = [x for x in self.data[self.plotType + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                ylist = [y for y in self.data['Heat ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                
+                xArray = np.array(xlist)
+                yArray = np.array(ylist)
+                
+                self.ax.plot(xlist, ylist)
+                
+                Area = integrate.simpson(yArray, xArray)
+                if self.plotType == True: Area = Area / self.rampRate
+                self.ax.text(0, 1, 'Area: ' + str(Area), transform = self.ax.transAxes)
+                self.fig.canvas.draw()
+            
+        except Exception as error:
+            print(error)
+            self.cleanPlot()
+            self.plot()
+            self.fig.canvas.draw()
         
+    def autoNucTime(self, run):
         
+        ind = None
+        for i in range(len(self.data)):
+            if i == 0:
+                continue
+            else:
+                if self.data.iloc[i, 1+(run-1)*3] <= 80 and self.data.iloc[i-1, 1+(run-1)*3] >= 80:
+                    
+                    ind = i
+                    break
+        xRaw = self.data.iloc[ind:, (run-1)*3].tolist()
+        
+        x = [a - xRaw[0] for a in xRaw]
+        y = self.data.iloc[ind:, 1+(run-1)*3].tolist()
+        
+        dydx = np.diff(y)/np.diff(x)
+        x.pop(-1)
+        
+        dy2d2x = np.diff(dydx)/np.diff(x)
+        return round(x[np.where(dy2d2x == min(dy2d2x))[0][0]], 1)
+    
     ### TESTING ###
             
 if __name__ == "__main__":
-    data = DSCData(r"D:\DSC\Naphthalene Ramping\Sample_10_31_23\105 M\Naphthalene Ramp 30 105M 25Q 10_31_23.csv")
-    data.plotRun=1
-    data.plot('temp')
+    data = DSCData(r"E:\DSC\Naphthalene Ramping\Sample_10_31_23\105 M\Naphthalene Ramp 30 105M 25Q 10_31_23.csv")
+    # data.plotRun=1
+    # data.plot('temp')
     # data.plotRun = 0
     # data.plot(x = 'temp')
