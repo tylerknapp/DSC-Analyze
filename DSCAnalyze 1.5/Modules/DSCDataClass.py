@@ -5,10 +5,11 @@ Created on Tue Jan 23 10:57:09 2024
 @author: tyler
 Version 1.5
 """
-
+import os
+import sys
+import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import numpy as np
 import scipy.integrate as integrate
 
 class DSCData:
@@ -36,7 +37,7 @@ class DSCData:
         # Plot Related
         self.fig, self.ax = plt.subplots() # Create one figure, fig, with two subplots, axTemp and axTime
         self.cid = self.fig.canvas.mpl_connect('pick_event', self.onpick)
-        self.plotType = 'Temp'
+        self.plotType = ['Temp', 'Heat']
         
         # Analysis Variables
         self.pointBank = []
@@ -112,7 +113,7 @@ class DSCData:
                     dfNew['Time ' + str(i+1)] = dfNew['Time ' + str(i+1)] - dfNew['Time ' + str(i+1)].iloc[0]
                     
                     
-                return dfNew
+                return self.rampCalc(dfNew)
             
             elif locator == 'operator':
                 return lines[2].removeprefix('Operator,')
@@ -140,33 +141,47 @@ class DSCData:
                 return int(textList[1])
         
 
+    def rampCalc(self, df):
+        for i in range(1, self.runs+1):
+            diffList = [None]
+            for j, x in enumerate(df['Temp ' + str(i)]):
+                if j == 0:
+                    continue
+                else:
+                    diffList.append(((df['Temp ' + str(i)].iloc[j]-df['Temp ' + str(i)].iloc[j-1])/0.1)*60)
+            df['Temp Diff ' + str(i)] = diffList
+        
+        return df
+        
     def plot(self):
         try:
             if self.plotRun == 0:
                 
                 if self.scatter == False:
                     for i in range(0, self.runs):
-                        self.ax.plot(self.data[self.plotType + ' ' + str(i+1)], self.data['Heat ' + str(i+1)],
+                        self.ax.plot(self.data[self.plotType[0] + ' ' + str(i+1)], self.data[self.plotType[1] + ' ' + str(i+1)],
                                          picker = True, pickradius = 2)
                 else:
                     for i in range(0, self.runs):
-                        self.ax.scatter(self.data[self.plotType + ' ' + str(i+1)], self.data['Heat ' + str(i+1)],
+                        self.ax.scatter(self.data[self.plotType[0] + ' ' + str(i+1)], self.data[self.plotType[1] + ' ' + str(i+1)],
                                          picker = True, pickradius = 2)
             else:
                 
                 if self.scatter == False:
-                    self.ax.plot(self.data[self.plotType + ' ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
+                    self.ax.plot(self.data[self.plotType[0] + ' ' + str(self.plotRun)], self.data[self.plotType[1] + ' ' + str(self.plotRun)],
                                      picker = True, pickradius = 2)
                 else:
-                    self.ax.scatter(self.data[self.plotType + ' ' + str(self.plotRun)], self.data['Heat ' + str(self.plotRun)],
+                    self.ax.scatter(self.data[self.plotType[0] + ' ' + str(self.plotRun)], self.data[self.plotType[1] + ' ' + str(self.plotRun)],
                                      picker = True, pickradius = 2)
             if __name__ == "__main__": self.fig.show()
 
             
             self.ax.set_title(self.plotTitle)
-            if self.plotType == 'Temp': self.ax.set_xlabel('Temperature (°C)')
+            if self.plotType[0] == 'Temp': self.ax.set_xlabel('Temperature (°C)')
             else: self.ax.set_xlabel('Time (s)')
-            self.ax.set_ylabel('Heat Flow (W/g)')
+            if self.plotType[1] == 'Heat': self.ax.set_ylabel('Heat Flow (W/g)')
+            elif self.plotType[1] == 'Temp': self.ax.set_ylabel('Temperature (°C)')
+            else: self.ax.set_ylabel('Ramp Rate (°C/min)')
             
             self.cid = self.fig.canvas.mpl_connect('pick_event', self.onpick)
             
@@ -193,9 +208,9 @@ class DSCData:
         ind = event.ind
         points = (xdata, ydata, ind)
 
-        self.ax.text(self.data[self.plotType + ' ' + str(self.plotRun)].iloc[ind[0]], 
+        self.ax.text(self.data[self.plotType[0] + ' ' + str(self.plotRun)].iloc[ind[0]], 
                      self.data['Heat ' + str(self.plotRun)].iloc[ind[0]],
-                     self.data[self.plotType + ' ' + str(self.plotRun)].iloc[ind[0]])
+                     self.data[self.plotType[0] + ' ' + str(self.plotRun)].iloc[ind[0]])
         self.fig.canvas.draw()
         
         if self.analysisMode == True:
@@ -213,8 +228,8 @@ class DSCData:
             # Get first linear line
             if len(self.pointBank) == 2:
                 
-                xlist = [x for x in self.data[self.plotType + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
-                ylist = [y for y in self.data['Heat ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                xlist = [x for x in self.data[self.plotType[0] + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                ylist = [y for y in self.data[self.plotType[1] + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
                 
                 xArray = np.array(xlist)
                 yArray = np.array(ylist)
@@ -227,8 +242,8 @@ class DSCData:
                 
             # Get second linear line
             if len(self.pointBank) == 4:
-                xlist = [x for x in self.data[self.plotType + ' ' + str(cRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
-                ylist = [y for y in self.data['Heat ' + str(cRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
+                xlist = [x for x in self.data[self.plotType[0] + ' ' + str(cRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
+                ylist = [y for y in self.data[self.plotType[1] + ' ' + str(cRun)].iloc[self.pointBank[2][2]:self.pointBank[3][2]]]
                 
                 xArray = np.array(xlist)
                 yArray = np.array(ylist)
@@ -250,7 +265,8 @@ class DSCData:
                 # Place text at intersection
                 self.ax.text(0, 1, 'Intersection: ' + str(Inters[0]), transform = self.ax.transAxes)
                 self.fig.canvas.draw()
-        except:
+        except Exception as error:
+            print(error)
             self.cleanPlot()
             self.plot()
             self.fig.canvas.draw()
@@ -281,17 +297,17 @@ class DSCData:
             cRun = self.plotRun
             
             if len(self.pointBank) == 2:
-                xlist = [x for x in self.data[self.plotType + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
-                ylist = [y for y in self.data['Heat ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                xlist = [x for x in self.data[self.plotType[0] + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
+                ylist = [y for y in self.data[self.plotType[1] + ' ' + str(cRun)].iloc[self.pointBank[0][2]:self.pointBank[1][2]]]
                 
                 xArray = np.array(xlist)
                 yArray = np.array(ylist)
                 
                 self.ax.plot(xlist, ylist)
                 
-                Area = integrate.simpson(yArray, xArray)
-                if self.plotType == True: Area = Area / self.rampRate
-                self.ax.text(0, 1, 'Area: ' + str(Area), transform = self.ax.transAxes)
+                Heat = integrate.simpson(yArray, xArray)
+                if self.plotType == ['Temp', 'Heat']: Heat = Heat / (self.rampRate / 60)
+                self.ax.text(0, 1, 'Heat: ' + str(Heat), transform = self.ax.transAxes)
                 self.fig.canvas.draw()
             
         except Exception as error:
@@ -325,7 +341,7 @@ class DSCData:
     ### TESTING ###
             
 if __name__ == "__main__":
-    data = DSCData(r"E:\DSC\Naphthalene Ramping\Sample_10_31_23\105 M\Naphthalene Ramp 30 105M 25Q 10_31_23.csv")
+    data = DSCData(r"D:\DSC\Naphthalene Ramping\Sample_10_31_23\105 M\Naphthalene Ramp 30 105M 25Q 10_31_23.csv")
     # data.plotRun=1
     # data.plot('temp')
     # data.plotRun = 0
